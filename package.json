@@ -23,7 +23,26 @@
     "url": "https://github.com/open-xml-templating/docxtemplater"
   },
   "dependencies": {
-    "jszip": "^2.5.0"
+    "jszip": "^2.5.0",
+    "lodash.assign": "^3.2.0",
+    "lodash.create": "^3.1.1",
+    "lodash.defaults": "^3.1.2",
+    "lodash.findwhere": "^3.1.0",
+    "lodash.foreach": "^3.0.3",
+    "lodash.invoke": "^3.2.3",
+    "lodash.isarray": "^3.0.4",
+    "lodash.isempty": "^3.0.4",
+    "lodash.isnull": "^3.0.0",
+    "lodash.isnumber": "^3.0.1",
+    "lodash.isobject": "^3.0.2",
+    "lodash.isplainobject": "^3.2.0",
+    "lodash.isstring": "^3.0.1",
+    "lodash.isundefined": "^3.0.1",
+    "lodash.keys": "^3.1.2",
+    "lodash.map": "^3.1.4",
+    "lodash.pick": "^3.1.0",
+    "lodash.pluck": "^3.1.2",
+    "lodash.reduce": "^3.1.2"
   },
   "devDependencies": {
     "angular-expressions": "^0.3.0",
