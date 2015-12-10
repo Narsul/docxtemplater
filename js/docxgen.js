@@ -1,13 +1,13 @@
 var assign = require('lodash.assign');
-var forEach = require('lodash.foreach');
 var isEmpty = require('lodash.isempty');
 var jsZip = require('jszip');
 var keys = require('lodash.keys');
 var pick = require('lodash.pick');
 var pluck = require('lodash.pluck');
+var Q = require('q');
 var reduce = require('lodash.reduce');
 
-var DocxGen = function DocxGen (content, options) {
+var DocxGen = function DocxGen(content, options) {
     var ModuleManager = require('./moduleManager');
     this.moduleManager = new ModuleManager();
     this.moduleManager.gen = this;
@@ -19,12 +19,12 @@ var DocxGen = function DocxGen (content, options) {
 };
 
 assign(DocxGen.prototype, {
-    attachModule : function (module) {
+    attachModule: function (module) {
         this.moduleManager.attachModule(module);
         return this;
     },
 
-    setOptions : function (options) {
+    setOptions: function (options) {
         var docUtils = require('./docUtils');
         this.options = assign({}, options);
         reduce(docUtils.defaults, function (memo, defaultValue, key) {
@@ -34,17 +34,17 @@ assign(DocxGen.prototype, {
         return this;
     },
 
-    getTemplateClass : function () {
+    getTemplateClass: function () {
         var DocXTemplater = require('./docxTemplater');
         return DocXTemplater;
     },
 
-    getTemplatedFiles : function () {
+    getTemplatedFiles: function () {
         var slideTemplates = pluck(this.zip.file(/word\/(header|footer)\d+\.xml/), 'name');
         return slideTemplates.concat(['word/document.xml']);
     },
 
-    load : function (content, options) {
+    load: function (content, options) {
         this.moduleManager.sendEvent('loading');
         this.zip = content.file
             ? content
@@ -54,25 +54,31 @@ assign(DocxGen.prototype, {
         return this;
     },
 
-    renderFile : function (fileName) {
+    renderFile: function (fileName) {
         this.moduleManager.sendEvent('rendering-file', fileName);
         var currentFile = this.createTemplateClass(fileName);
-        this.zip.file(fileName, currentFile.render().content);
-        return this.moduleManager.sendEvent('rendered-file', fileName);
+        return Q.when(currentFile.render())
+            .then(function (template) {
+                this.zip.file(fileName, template.content);
+                this.moduleManager.sendEvent('rendered-file', fileName);
+            }.bind(this));
     },
 
-    render : function () {
+    render: function () {
         this.moduleManager.sendEvent('rendering');
-        forEach(this.templatedFiles, function (fileName) {
+        var renderPromises = reduce(this.templatedFiles, function (memo, fileName) {
             if (this.zip.files[fileName]) {
-                this.renderFile(fileName);
+                memo.push(this.renderFile(fileName));
             }
-        }.bind(this));
-        this.moduleManager.sendEvent('rendered');
-        return this;
+            return memo;
+        }.bind(this), []);
+        return Q.all(renderPromises)
+            .then(function () {
+                this.moduleManager.sendEvent('rendered');
+            }.bind(this));
     },
 
-    getTags : function () {
+    getTags: function () {
         return reduce(this.templatedFiles, function (usedTags, fileName) {
             if (!this.zip.files[fileName]) {
                 return usedTags;
@@ -80,33 +86,33 @@ assign(DocxGen.prototype, {
             var currentFile = this.createTemplateClass(fileName);
             var usedTemplateV = currentFile.render().usedTags;
             if (!isEmpty(usedTemplateV)) {
-                usedTags.push({fileName : fileName, vars : usedTemplateV});
+                usedTags.push({fileName: fileName, vars: usedTemplateV});
             }
             return usedTags;
         }.bind(this), []);
     },
 
-    setData : function (tags) {
+    setData: function (tags) {
         this.tags = tags;
         return this;
     },
 
-    getZip : function () {
+    getZip: function () {
         return this.zip;
     },
 
-    createTemplateClass : function (path) {
+    createTemplateClass: function (path) {
         var docUtils = require('./docUtils');
         var usedData = this.zip.files[path].asText();
         var obj = {
-            tags          : this.tags,
-            moduleManager : this.moduleManager
+            tags: this.tags,
+            moduleManager: this.moduleManager
         };
         assign(obj, pick(this, keys(docUtils.defaults)));
         return new this.templateClass(usedData, obj);
     },
 
-    getFullText : function (path) {
+    getFullText: function (path) {
         path = path || 'word/document.xml';
         return this.createTemplateClass(path).getFullText();
     }
